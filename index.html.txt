@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Pengurusan Stok Seksyen Immunoassay</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+  <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-teal-800 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-vial-virus text-2xl text-teal-300"></i>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">Sistem Stok Immunoassay</h1>
+          <p class="text-xs text-teal-200">Makmal Patologi Klinikal / Diagnostik</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="exportToCSV()" class="bg-teal-700 hover:bg-teal-600 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-file-export"></i> Eksport CSV
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- KPI / Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Item</p>
+          <h3 id="stat-total-items" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center text-xl">
+          <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Stok Rendah</p>
+          <h3 id="stat-low-stock" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-xl">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hampir Luput (&lt;30 Hari)</p>
+          <h3 id="stat-near-expiry" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center text-xl">
+          <i class="fa-solid fa-calendar-xmark"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Suhu</p>
+          <h3 class="text-base font-semibold text-emerald-600 mt-1">2–8°C / -20°C OK</h3>
+        </div>
+        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center text-xl">
+          <i class="fa-solid fa-temperature-low"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions & Filter Bar -->
+    <div class="flex flex-col md:flex-row justify-between gap-4 mb-4">
+      <div class="flex-1 flex gap-2">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
+          <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari nama ujian, no lot, atau katalog..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm">
+        </div>
+        <select id="categoryFilter" onchange="filterTable()" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+          <option value="">Semua Kategori</option>
+          <option value="Reagent Kit">Reagent Kit</option>
+          <option value="Calibrator">Calibrator</option>
+          <option value="Quality Control">Quality Control</option>
+          <option value="Buffer / Consumable">Buffer / Consumable</option>
+        </select>
+      </div>
+      <div>
+        <button onclick="openModal()" class="w-full md:w-auto bg-teal-600 hover:bg-teal-700 text-white font-medium px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition shadow">
+          <i class="fa-solid fa-plus"></i> Tambah Item Baru
+        </button>
+      </div>
+    </div>
+
+    <!-- Inventory Table -->
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-100 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Nama Item / Analit</th>
+              <th class="py-3 px-4">Kategori</th>
+              <th class="py-3 px-4">No. Lot</th>
+              <th class="py-3 px-4">Baki Semasa</th>
+              <th class="py-3 px-4">Tarikh Luput</th>
+              <th class="py-3 px-4">Lokasi / Suhu</th>
+              <th class="py-3 px-4 text-center">Tindakan</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryTableBody" class="divide-y divide-slate-200">
+            <!-- Data dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+      <div id="emptyMessage" class="hidden p-8 text-center text-slate-400">
+        <i class="fa-solid fa-box-open text-4xl mb-2"></i>
+        <p>Tiada rekod stok dijumpai.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal Tambah/Edit Item -->
+  <div id="stockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+      <div class="bg-teal-800 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="font-bold text-base" id="modalTitle">Daftar Stok Baru</h3>
+        <button onclick="closeModal()" class="text-teal-200 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="stockForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="itemId">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Item / Reagen *</label>
+          <input type="text" id="itemName" required placeholder="cth: Roche Elecsys FT4 (200 test)" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Kategori *</label>
+            <select id="itemCategory" required class="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none">
+              <option value="Reagent Kit">Reagent Kit</option>
+              <option value="Calibrator">Calibrator</option>
+              <option value="Quality Control">Quality Control</option>
+              <option value="Buffer / Consumable">Buffer / Consumable</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">No. Lot *</label>
+            <input type="text" id="itemLot" required placeholder="cth: 64829101" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Kuantiti Semasa *</label>
+            <input type="number" id="itemQuantity" min="0" required placeholder="cth: 10" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Paras Minimum (Alert) *</label>
+            <input type="number" id="itemMinThreshold" min="1" required value="3" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Tarikh Luput *</label>
+            <input type="date" id="itemExpiry" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Suhu Simpanan</label>
+            <select id="itemStorage" class="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none">
+              <option value="2-8°C">2–8°C (Chiller)</option>
+              <option value="-20°C">-20°C (Freezer)</option>
+              <option value="15-25°C">15–25°C (Suhu Bilik)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Lokasi Rak / Peti</label>
+          <input type="text" id="itemLocation" placeholder="cth: Chiller Immuno 1 - Rak B" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+        </div>
+        <div class="pt-3 border-t flex justify-end gap-2">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-100">Batal</button>
+          <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium shadow">Simpan Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    // Initial Seed Data jika LocalStorage kosong
+    const initialData = [
+      { id: '1', name: 'Elecsys TSH (200 Tests)', category: 'Reagent Kit', lot: '631245', quantity: 6, minThreshold: 3, expiry: '2027-05-18', storage: '2-8°C', location: 'Chiller A - Rak 1' },
+      { id: '2', name: 'Elecsys Free T4 (200 Tests)', category: 'Reagent Kit', lot: '639812', quantity: 2, minThreshold: 3, expiry: '2026-11-20', storage: '2-8°C', location: 'Chiller A - Rak 1' },
+      { id: '3', name: 'Troponin I STAT (100 Tests)', category: 'Reagent Kit', lot: '710034', quantity: 4, minThreshold: 2, expiry: '2026-12-05', storage: '2-8°C', location: 'Chiller B - Rak 2' },
+      { id: '4', name: 'PreciControl Cardiac (Level 1,2,3)', category: 'Quality Control', lot: 'QC-9921', quantity: 1, minThreshold: 2, expiry: '2027-01-30', storage: '-20°C', location: 'Freezer 1' },
+      { id: '5', name: 'Universal ProCell / CleanCell Buffer', category: 'Buffer / Consumable', lot: 'B-4401', quantity: 12, minThreshold: 5, expiry: '2027-09-10', storage: '15-25°C', location: 'Stor Bahan Kimia' }
+    ];
+
+    let inventory = JSON.parse(localStorage.getItem('immuno_inventory')) || initialData;
+
+    function saveInventory() {
+      localStorage.setItem('immuno_inventory', JSON.stringify(inventory));
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('inventoryTableBody');
+      tbody.innerHTML = '';
+
+      let lowStockCount = 0;
+      let nearExpiryCount = 0;
+      const today = new Date();
+
+      inventory.forEach(item => {
+        const expiryDate = new Date(item.expiry);
+        const diffDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+
+        const isLow = Number(item.quantity) <= Number(item.minThreshold);
+        const isNearExpiry = diffDays <= 30 && diffDays >= 0;
+        const isExpired = diffDays < 0;
+
+        if (isLow) lowStockCount++;
+        if (isNearExpiry || isExpired) nearExpiryCount++;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+        let badgeExpiry = '';
+        if (isExpired) {
+          badgeExpiry = `<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-xs font-semibold">Telah Luput</span>`;
+        } else if (isNearExpiry) {
+          badgeExpiry = `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-semibold">${diffDays} hari lagi</span>`;
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-medium text-slate-900">${item.name}</td>
+          <td class="py-3 px-4"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium">${item.category}</span></td>
+          <td class="py-3 px-4 font-mono text-xs">${item.lot}</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-sm ${isLow ? 'text-rose-600' : 'text-slate-700'}">${item.quantity}</span>
+              ${isLow ? '<span class="text-xs bg-rose-50 text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded">Rendah</span>' : ''}
+            </div>
+          </td>
+          <td class="py-3 px-4">
+            <div class="text-xs">${item.expiry}</div>
+            <div class="mt-0.5">${badgeExpiry}</div>
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-500">
+            <div><i class="fa-solid fa-snowflake text-cyan-600 mr-1"></i>${item.storage}</div>
+            <div>${item.location || '-'}</div>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex justify-center items-center gap-1">
+              <button onclick="adjustQuantity('${item.id}', 1)" title="Guna 1 Pek (-)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded flex items-center justify-center text-xs transition">
+                <i class="fa-solid fa-minus"></i>
+              </button>
+              <button onclick="adjustQuantity('${item.id}', -1)" title="Tambah 1 Pek (+)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded flex items-center justify-center text-xs transition">
+                <i class="fa-solid fa-plus"></i>
+              </button>
+              <button onclick="deleteItem('${item.id}')" title="Padam Item" class="w-7 h-7 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded flex items-center justify-center text-xs transition ml-2">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Update KPI
+      document.getElementById('stat-total-items').textContent = inventory.length;
+      document.getElementById('stat-low-stock').textContent = lowStockCount;
+      document.getElementById('stat-near-expiry').textContent = nearExpiryCount;
+
+      filterTable();
+    }
+
+    function adjustQuantity(id, changeDirection) {
+      const item = inventory.find(i => i.id === id);
+      if (!item) return;
+
+      if (changeDirection === 1) { // Deduct 1 unit
+        if (item.quantity > 0) {
+          item.quantity = Number(item.quantity) - 1;
+        } else {
+          alert('Baki stok sudah kosong (0)!');
+          return;
+        }
+      } else { // Add 1 unit
+        item.quantity = Number(item.quantity) + 1;
+      }
+      saveInventory();
+    }
+
+    function deleteItem(id) {
+      if (confirm('Adakah anda pasti mahu memadam rekod item ini?')) {
+        inventory = inventory.filter(i => i.id !== id);
+        saveInventory();
+      }
+    }
+
+    function openModal() {
+      document.getElementById('stockForm').reset();
+      document.getElementById('itemId').value = '';
+      document.getElementById('stockModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('stockModal').classList.add('hidden');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const newItem = {
+        id: Date.now().toString(),
+        name: document.getElementById('itemName').value,
+        category: document.getElementById('itemCategory').value,
+        lot: document.getElementById('itemLot').value,
+        quantity: parseInt(document.getElementById('itemQuantity').value, 10),
+        minThreshold: parseInt(document.getElementById('itemMinThreshold').value, 10),
+        expiry: document.getElementById('itemExpiry').value,
+        storage: document.getElementById('itemStorage').value,
+        location: document.getElementById('itemLocation').value
+      };
+
+      inventory.push(newItem);
+      saveInventory();
+      closeModal();
+    }
+
+    function filterTable() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const category = document.getElementById('categoryFilter').value;
+      const rows = document.querySelectorAll('#inventoryTableBody tr');
+
+      let visibleCount = 0;
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        const matchesSearch = text.includes(search);
+        const matchesCategory = category === '' || text.includes(category.toLowerCase());
+
+        if (matchesSearch && matchesCategory) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      document.getElementById('emptyMessage').style.display = (visibleCount === 0) ? 'block' : 'none';
+    }
+
+    function exportToCSV() {
+      if (inventory.length === 0) {
+        alert('Tiada data untuk dieksport.');
+        return;
+      }
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "ID,Nama Item,Kategori,No Lot,Kuantiti Semasa,Paras Minima,Tarikh Luput,Suhu,Lokasi\\n";
+
+      inventory.forEach(i => {
+        csvContent += `"${i.id}","${i.name}","${i.category}","${i.lot}","${i.quantity}","${i.minThreshold}","${i.expiry}","${i.storage}","${i.location || ''}"\\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Stok_Immunoassay_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Papar data permulaan semasa halaman dimuatkan
+    window.onload = renderTable;
+  </script>
+</body>
+</html>
